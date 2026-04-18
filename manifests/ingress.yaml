@@ -1,0 +1,38 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: posthoot-ingress
+  namespace: posthoot
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: payments.xem.email
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: payments
+            port:
+              number: 80
+  - host: app.xem.email
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: xemapp
+            port:
+              number: 80
+  - host: api.xem.email
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: posthoot
+            port:
+              number: 80

@@ -178,3 +178,7 @@ aws ce get-cost-and-usage \
 - Multi-AZ = High availability ✅
 - PDBs = Zero downtime on spot interruptions ✅
 - Total cost: **~$20/mo for production cluster** 🎯
+
+## Local application credentials
+
+Copy `xemapp-secrets.example.yaml` to `manifests/xemapp-secrets.yaml`, replace every placeholder with your environment credentials, and apply that local file with `kubectl apply -f manifests/xemapp-secrets.yaml`. The populated file is ignored by Git. Keep the example outside `manifests/` so directory-wide applies cannot overwrite credentials with placeholders.

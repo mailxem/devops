@@ -1,3 +1,4 @@
 # Kubernetes secrets with actual values
 *-secrets.local.yaml
 secrets.yaml
+/manifests/xemapp-secrets.yaml

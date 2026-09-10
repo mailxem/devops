@@ -53,7 +53,7 @@ spec:
   containerRuntime: containerd
 
   # S3 bucket for state
-  configBase: s3://posthoot-kops-state/posthoot.k8s.local
+  configBase: s3://posthoot-kops-state-696777127513/posthoot.k8s.local
 
   # Authorization
   authorization:

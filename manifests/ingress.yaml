@@ -3,8 +3,16 @@ kind: Ingress
 metadata:
   name: posthoot-ingress
   namespace: posthoot
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
   ingressClassName: nginx
+  tls:
+  - hosts:
+    - payments.xem.email
+    - app.xem.email
+    - api.xem.email
+    secretName: xem-email-tls
   rules:
   - host: payments.xem.email
     http:

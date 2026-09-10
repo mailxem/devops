@@ -1,16 +1,13 @@
 #!/bin/bash
 set -e
 
-export AWS_PROFILE=xem
 export AWS_REGION=us-east-2
 CLUSTER_NAME=posthoot.k8s.local
-KOPS_STATE_STORE=s3://posthoot-kops-state
+KOPS_STATE_STORE=s3://posthoot-kops-state-696777127513
 
 echo "🚀 Kops cluster - x86 spot only (us-east-2)"
 
-# S3 bucket
-aws s3 mb $KOPS_STATE_STORE --region $AWS_REGION 2>/dev/null || echo "Bucket exists"
-aws s3api put-bucket-versioning --bucket posthoot-kops-state --versioning-configuration Status=Enabled
+# S3 bucket (already created with versioning enabled)
 
 export KOPS_STATE_STORE=$KOPS_STATE_STORE
 

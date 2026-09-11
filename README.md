@@ -1,184 +1,56 @@
-# Kops Kubernetes Cluster with Spot Instances
+# Xem infrastructure
 
-Ultra-cheap production-ready Kubernetes on AWS using Kops + Spot instances.
+Terraform and Helm for Xem's API, frontend, and managed SMTP backed by Amazon SES. Optional payments and MCP services are included in the chart. Application settings and SMTP flags remain in Infisical; this repository contains no credentials.
 
-**Cost: ~$15-25/month** (vs $150+ with EKS)
+## Choose a deployment path
 
-## Architecture
+| Path | Resources owned here | Prerequisites |
+| --- | --- | --- |
+| [Existing Dokploy/EC2](docs/terraform-adoption.md) | Imported EC2, Elastic IP, SMTP security group, runtime role/profile, existing sending CloudFormation stack | Existing VPC/subnet, administrative SG, Dokploy, external PostgreSQL and Redis |
+| [Kubernetes](docs/kubernetes.md) | Workload IAM role, distinct sending stack, Helm application workloads, HTTP ingress, TCP SMTP service, optional cert-manager resources | Supported Kubernetes cluster, IAM OIDC provider, ingress controller, cert-manager, load-balancer controller, external PostgreSQL and Redis |
+| [Platform domain](docs/terraform-adoption.md#platform-domain-and-cloudflare) | SES platform identity, DKIM, custom MAIL FROM, optional DMARC, DNS-only SMTP record | Cloudflare authoritative zone and scoped API token |
 
+The Kubernetes root does **not** provision a cluster. The EC2 root is an **adoption configuration**, not an unattended new-server installer. Neither path creates databases, installs controllers, approves SES production access, or deploys the static marketing website. Those have separate lifecycles. Do not point both runtimes at the same production database with sending workers active.
+
+```mermaid
+flowchart LR
+  Client[SMTP client] -->|TCP 587 + STARTTLS| Edge[EC2 published port or Kubernetes NLB]
+  Edge -->|TCP 2525| API[Xem backend]
+  API -->|TLS AWS API + runtime IAM role| SES[Amazon SES]
+  SES --> Inbox[Recipient mail server]
+  SES --> SNS[SNS delivery feedback]
+  SNS -->|Signed HTTPS event| API
+  Browser[Browser] --> Web[Frontend]
+  Web -->|API HTTP inside deployment| API
+  API --> DB[(External PostgreSQL / Redis)]
+  Infisical[Infisical settings] --> API
+  ACME[Public ACME certificate] --> API
 ```
-┌─────────────────────────────────────────┐
-│         Kops Cluster (Multi-AZ)         │
-│                                         │
-│  Master (t3.micro)      $2.31/mo        │
-│    └─ us-east-1a                        │
-│                                         │
-│  Workers (Spot)        $10-15/mo        │
-│    ├─ m5.large @ $0.03/hr max          │
-│    ├─ Mixed instances (5 types)        │
-│    └─ Auto-spread across 3 AZs         │
-│                                         │
-│  Storage                $2-3/mo         │
-│    └─ GP3 EBS volumes                  │
-└─────────────────────────────────────────┘
-```
 
-## Quick Start
+Cloudflare provides authoritative DNS and ACME DNS challenges for Kubernetes. SMTP records must be DNS-only. Cloudflare Origin CA certificates are not trusted by ordinary SMTP clients; use a public CA such as Let's Encrypt.
+
+## Layout
+
+- `terraform/environments/{dokploy,kubernetes,domain}`: independent state roots with pinned providers.
+- `terraform/modules`: reusable runtime identity, sending stack, and platform DNS modules.
+- `charts/xem`: application chart; no embedded database or secret values.
+- `host/` and `scripts/install-dokploy-smtp-tls.sh`: certificate export and read-only host mirror.
+- `scripts/smtp-smoke.py`: transport-only test, no email or credentials.
+- `legacy/`: archived Kops/manifests; **not supported deployment instructions**.
+
+Start with [DEPLOYMENT.md](DEPLOYMENT.md). The [production snapshot](docs/production-status.md) records what was actually verified and the remaining delivery checks.
+
+## Validate locally
+
+Use Terraform 1.16.2, Helm 3.18.6, Python 3.12 with PyYAML 6.0.2 / jsonschema 4.23.0, and kubeconform 0.7.0. Modules require Terraform >=1.10 for S3 locking. CI uses the pinned versions and requires no AWS or Cloudflare credentials.
 
 ```bash
-cd aws-k8s-kops
-
-# Setup cluster (15 minutes)
-chmod +x setup-kops.sh
-./setup-kops.sh
-
-# Install spot interruption handler
-kubectl apply -f install-spot-handler.yaml
-
-# Deploy apps
-kubectl apply -f ../manifests/
-
-# Verify
-kubectl get nodes
-kubectl get pods -A
+python3 -m pip install PyYAML==6.0.2 jsonschema==4.23.0
+go install github.com/yannh/kubeconform/cmd/kubeconform@v0.7.0
+bash scripts/validate.sh
+python3 scripts/smtp-smoke.py smtp.xem.email
 ```
 
-## What You Get
+The validation script initializes providers with the backend disabled, runs plan-only IAM tests with dummy credentials and no AWS lookups, checks rendered manifests, and exercises certificate rotation with an ephemeral local CA. The optional smoke command contacts the named SMTP endpoint. Validation does not establish that images start in a real cluster or that SES accepts authenticated messages.
 
-- ✅ **Kubernetes 1.31** (latest stable)
-- ✅ **Spot instances** (60-80% savings)
-- ✅ **Multi-AZ** (3 zones for resilience)
-- ✅ **Auto-scaling** (2-10 nodes)
-- ✅ **Spot interruption handling** (2-min graceful drain)
-- ✅ **Mixed instance types** (better spot availability)
-
-## Cost Breakdown
-
-| Resource | Type | Cost/mo |
-|----------|------|---------|
-| Master | t3.micro | $2.31 |
-| Node 1 | m5.large spot | $5-7 |
-| Node 2 | m5.large spot | $5-7 |
-| EBS | GP3 (24GB) | $2-3 |
-| S3 | State store | <$0.50 |
-| **Total** | | **$15-20** |
-
-Compare to EKS:
-- EKS control plane: $73/mo
-- Same nodes: $15/mo
-- Total: **$88/mo**
-
-**Savings: ~75%** 🎉
-
-## Management
-
-### Scale nodes
-```bash
-export KOPS_STATE_STORE=s3://posthoot-kops-state
-kops edit ig nodes-us-east-1a
-# Change minSize/maxSize
-kops update cluster posthoot.k8s.local --yes
-kops rolling-update cluster --yes
-```
-
-### Upgrade Kubernetes
-```bash
-kops edit cluster posthoot.k8s.local
-# Change kubernetesVersion: 1.32.0
-kops update cluster --yes
-kops rolling-update cluster --yes
-```
-
-### Add more spot instance types
-```bash
-kops edit ig nodes-us-east-1a
-# Add to mixedInstancesPolicy.instances:
-#   - r5.large
-#   - t3.large
-kops update cluster --yes
-```
-
-## Spot Interruptions
-
-AWS gives 2-minute warning before terminating spot instances.
-
-**Handler automatically**:
-1. Detects interruption notice
-2. Cordons node
-3. Drains pods gracefully (60s termination grace)
-4. Pods reschedule on other nodes
-5. Zero downtime (with PDBs)
-
-**Monitor**:
-```bash
-kubectl logs -n kube-system -l app=aws-node-termination-handler -f
-```
-
-## Troubleshooting
-
-### Cluster not ready
-```bash
-kops validate cluster --wait 15m
-kubectl get nodes
-kubectl get pods -A
-```
-
-### Spot instances not launching
-```bash
-# Check instance types available
-aws ec2 describe-spot-price-history \
-  --instance-types m5.large m5a.large c5.large \
-  --product-descriptions "Linux/UNIX" \
-  --max-results 10
-```
-
-### Master node crashed
-```bash
-# Kops auto-recovers but can force:
-kops rolling-update cluster --yes --force
-```
-
-### Destroy cluster
-```bash
-kops delete cluster posthoot.k8s.local --yes
-aws s3 rb s3://posthoot-kops-state --force
-```
-
-## Monitoring
-
-```bash
-# Cluster health
-kops validate cluster
-
-# Node status
-kubectl top nodes
-
-# Spot interruption events
-kubectl get events --all-namespaces | grep -i spot
-
-# Costs (after 1 week)
-aws ce get-cost-and-usage \
-  --time-period Start=2026-04-01,End=2026-04-30 \
-  --granularity MONTHLY \
-  --metrics BlendedCost
-```
-
-## Next Steps
-
-1. **Deploy apps**: All existing manifests work
-2. **Setup ALB**: Install AWS LB Controller
-3. **Add monitoring**: Prometheus/Grafana
-4. **Backups**: Velero for cluster backups
-5. **CI/CD**: Update deploy workflow
-
-## Notes
-
-- No EKS = No $73/mo control plane fee ✅
-- Spot = 60-80% cheaper than on-demand ✅
-- Multi-AZ = High availability ✅
-- PDBs = Zero downtime on spot interruptions ✅
-- Total cost: **~$20/mo for production cluster** 🎯
-
-## Local application credentials
-
-Copy `xemapp-secrets.example.yaml` to `manifests/xemapp-secrets.yaml`, replace every placeholder with your environment credentials, and apply that local file with `kubectl apply -f manifests/xemapp-secrets.yaml`. The populated file is ignored by Git. Keep the example outside `manifests/` so directory-wide applies cannot overwrite credentials with placeholders.
+Contributions should include an example without secrets and validation for changed behavior. Preserve resource ownership and provider lockfiles. Pin application image digests before production use; the chart's mutable image defaults are discovery examples, not a reproducible production release.

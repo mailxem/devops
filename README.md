@@ -34,6 +34,7 @@ Cloudflare provides authoritative DNS and ACME DNS challenges for Kubernetes. SM
 - `terraform/environments/{dokploy,kubernetes,domain}`: independent state roots with pinned providers.
 - `terraform/modules`: reusable runtime identity, sending stack, and platform DNS modules.
 - `charts/xem`: application chart; no embedded database or secret values.
+- `hakopod/xem.toml`: four-service self-hosted Hakopod configuration with public SMTP, STARTTLS readiness and automatic certificate renewal; see its [setup guide](hakopod/README.md).
 - `host/` and `scripts/install-dokploy-smtp-tls.sh`: certificate export and read-only host mirror.
 - `scripts/smtp-smoke.py`: transport-only test, no email or credentials.
 - `legacy/`: archived Kops/manifests; **not supported deployment instructions**.

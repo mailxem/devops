@@ -61,8 +61,6 @@ source = "ingress"
 hostname = "smtp.xem.email"
 mount_path = "/app/certificates/smtp"
 
-[aws]
-identities_file = "/etc/hakopod/aws-identities.toml"
 
 # Requires the operator's digest-pinned HAKOPOD_READINESS_PROBE_IMAGE.
 # Both HTTP and SMTP must pass; this probe never authenticates or sends email.
@@ -98,6 +96,7 @@ MANAGED_SMTP_TLS_CERT = "/app/certificates/smtp/tls.crt"
 MANAGED_SMTP_TLS_KEY = "/app/certificates/smtp/tls.key"
 # Keep account ID and this environment's SNS topic ARN in Infisical as well.
 MANAGED_SES_REGION = "us-east-2"
+HAKOPOD_AWS_IDENTITIES_FILE=/etc/hakopod/aws-identities.toml
 
 [services.backend.secrets]
 INFISICAL_API_URL = { ref = "infisical-api-url" }

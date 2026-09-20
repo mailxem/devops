@@ -61,6 +61,9 @@ source = "ingress"
 hostname = "smtp.xem.email"
 mount_path = "/app/certificates/smtp"
 
+[aws]
+identities_file = "/etc/hakopod/aws-identities.toml"
+
 # Requires the operator's digest-pinned HAKOPOD_READINESS_PROBE_IMAGE.
 # Both HTTP and SMTP must pass; this probe never authenticates or sends email.
 [services.backend.readiness]

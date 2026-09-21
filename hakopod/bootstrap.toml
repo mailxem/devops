@@ -30,7 +30,7 @@ image = "theboringhumane/xemgo:latest"
 port = 9001
 # Restore public = true for the HTTP TLS stage.
 public = true
-size = "large"
+size = "medium"
 replicas = 2
 update_strategy = "recreate"
 healthcheck = "/health"
@@ -236,3 +236,38 @@ PORT = "3000"
 XEM_MCP_PUBLIC_URL = "https://mcp.xem.email/mcp"
 XEM_API_BASE_URL = "https://api.xem.email/api/v1"
 XEM_MCP_ALLOWED_ORIGINS = ""
+
+# Private, password-protected Redis. No public TCP listener.
+[services.redis]
+image = "redis:8-alpine"
+port = 6379
+public = false
+size = "small"
+replicas = 1
+run_as_user = 999
+update_strategy = "recreate"
+termination_grace_seconds = 60
+command = ["sh", "-ec"]
+# Hash the password into a private ACL file rather than passing it in argv.
+# noeviction prevents Redis from silently evicting queued Celery messages.
+args = ['''
+: "${REDIS_PASSWORD:?Set the redis-password application secret}"
+umask 077
+password_hash="$(printf '%s' "$REDIS_PASSWORD" | sha256sum)"
+printf 'user default on #%s ~* &* +@all\n' "${password_hash%% *}" > /tmp/redis-users.acl
+unset REDIS_PASSWORD password_hash
+exec redis-server --bind 0.0.0.0 --port 6379 \
+  --aclfile /tmp/redis-users.acl --dir /data \
+  --appendonly yes --appendfsync everysec \
+  --maxmemory 256mb --maxmemory-policy noeviction
+''']
+
+[services.redis.secrets]
+REDIS_PASSWORD = { ref = "redis-password" }
+
+[services.redis.volume]
+mount_path = "/data"
+size_gib = 5
+
+[services.redis.network_access]
+from = ["payments","backend","mcp"]

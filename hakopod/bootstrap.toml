@@ -245,6 +245,7 @@ public = false
 size = "small"
 replicas = 1
 run_as_user = 999
+networks = ["app"]
 update_strategy = "recreate"
 termination_grace_seconds = 60
 command = ["sh", "-ec"]

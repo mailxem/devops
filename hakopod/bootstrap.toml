@@ -31,7 +31,7 @@ port = 9001
 # Restore public = true for the HTTP TLS stage.
 public = true
 size = "large"
-replicas = 1
+replicas = 2
 update_strategy = "recreate"
 healthcheck = "/health"
 # Bootstrap uses HTTP /health; restore STARTTLS readiness in the SMTP stage.
@@ -85,9 +85,9 @@ source_cidrs = ["0.0.0.0/0"]
 # failure_threshold = 3
 
 # Local storage persists; persistent services also get Recreate updates.
-[services.backend.volume]
-mount_path = "/app/storage"
-size_gib = 5
+# [services.backend.volume]
+# mount_path = "/app/storage"
+# size_gib = 5
 
 [services.backend.network_access]
 from = ["frontend", "payments", "mcp"]

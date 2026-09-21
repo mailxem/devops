@@ -5,7 +5,7 @@
 ## Prepare the application
 
 1. Confirm self-hosted mode and stage a private bootstrap revision as described below. Create the `xem` application in the chosen Hakopod project/environment, then verify the five HTTP hostnames (including `smtp.xem.email` for certificate ownership) in Custom domains and restore their mappings. Do not move production DNS before testing the destination.
-2. Confirm that `letsencrypt` is an available cert-manager issuer, or change each service's `tls` reference to a configured issuer/managed certificate. Domain ownership and certificate coverage must both pass. The TOML does not create an issuer.
+2. Confirm that `hakopod-acme` is an available cert-manager issuer, or change each service's `tls` reference to a configured issuer/managed certificate. Domain ownership and certificate coverage must both pass. The TOML does not create an issuer.
 3. Create the application-scoped secrets referenced below. Keep the backend and payments settings in separate, dedicated Infisical environments. The frontend does not load Infisical itself; supply its explicit secret references through Hakopod.
 4. Check database/Redis connectivity from the platform. They remain external; general egress excludes private/management CIDRs and metadata endpoints. Existing EC2-private endpoints are not automatically reachable.
 5. Verify the image build configuration, OAuth callbacks and payment webhook URLs for the target domains. Public frontend API/payment URLs are baked in at image build time; TOML environment values cannot rewrite the existing browser bundle. The payments hostname/API path here uses `payments.xem.email/api/v1`; adjust it to match the intended image and verified domain if different.

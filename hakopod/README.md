@@ -21,6 +21,7 @@ Required Hakopod secrets:
 | `payments-infisical-project-id`, `payments-infisical-environment` | Payments project ID and dedicated environment slug |
 | `frontend-auth-secret` | Frontend session secret; used by both Auth.js naming conventions |
 | `frontend-google-client-id`, `frontend-google-client-secret` | Google OAuth application credentials |
+| `frontend-assistant-redis-url` | Full authenticated Redis URL for frontend conversation storage, request limits and action locks |
 
 Backend Infisical must provide its existing PostgreSQL, Redis, JWT, storage and integration settings. Payments Infisical must provide its database, strong JWT/admin secrets and payment-provider settings. Infisical loads into process environment at startup, so its ports, URLs, flags and storage paths must agree with this file. Use a dedicated environment and test data; do not run two backend installations against the production queue.
 
@@ -29,6 +30,14 @@ For the final SMTP revision, mirror the managed-sending settings from `xem.toml`
 Do not set static AWS credentials, `AWS_PROFILE`, `AWS_ROLE_ARN`, `AWS_REGION` or `AWS_WEB_IDENTITY_TOKEN_FILE` in TOML/Secrets/Infisical. Hakopod injects its approved identity settings. Its spec validator rejects conflicting TOML bindings, but cannot inspect settings that the application later imports from Infisical.
 
 If an image is private, create a scoped managed registry credential and add `registry_credential = "NAME"` to that service. No registry password belongs in the file. Hakopod resolves the supplied mutable image tags to digests during deployment; image pull/architecture availability is not established by local validation.
+
+### Enable Ask Xem
+
+Both frontend configurations explicitly enable Ask Xem and map `ASSISTANT_REDIS_URL` to the `frontend-assistant-redis-url` application secret. Create that secret before applying either configuration. The frontend does not inherit Redis credentials from backend Infisical.
+
+For the Redis service in `bootstrap.toml`, the URL has the form `redis://default:<URL-encoded-password>@redis:6379/0`. Set the full value in Hakopod's secret manager using the existing `redis-password` secret's password; do not put the password in TOML or commit it. The bootstrap configuration allows the frontend to reach Redis and starts Redis before the frontend. For `xem.toml`, supply the URL of the reachable external Redis instance; use `rediss://` when TLS is required. Keep persistence enabled and use `noeviction` because conversations and action execution state must survive restarts.
+
+Redeploy the frontend after saving its runtime secret and applying the network configuration. An authenticated `GET /api/assistant` returning `enabled: false` means `XEM_ASSISTANT_ENABLED` is exactly `false`, or the production frontend has no `ASSISTANT_REDIS_URL`. Its empty conversation array in this state does not indicate that saved history was deleted. `enabled: true` confirms the feature gate and history read; also verify a read-only assistant reply to check MCP and model connectivity.
 
 ## Compose translation
 

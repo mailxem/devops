@@ -140,12 +140,15 @@ NEXT_PUBLIC_API_URL = "https://api.xem.email/api/v1"
 NEXT_PUBLIC_PAYWALL_URL = "https://payments.xem.email/api/v1"
 NEXTAUTH_URL = "https://app.xem.email"
 AUTH_TRUST_HOST = "true"
+XEM_ASSISTANT_ENABLED = "true"
 
 [services.frontend.secrets]
 AUTH_SECRET = { ref = "frontend-auth-secret" }
 NEXTAUTH_SECRET = { ref = "frontend-auth-secret" }
 GOOGLE_CLIENT_ID = { ref = "frontend-google-client-id" }
 GOOGLE_CLIENT_SECRET = { ref = "frontend-google-client-secret" }
+# Create this application secret with the full authenticated Redis URL.
+ASSISTANT_REDIS_URL = { ref = "frontend-assistant-redis-url" }
 
 [services.payments]
 image = "ghcr.io/mailxem/payments.go:latest"
